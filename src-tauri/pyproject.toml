@@ -1,0 +1,26 @@
+[project]
+name = "pytauri-moviepy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "you" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pytauri == 0.8.*",
+    "pydantic == 2.*",
+    "anyio == 4.*",
+    "moviepy >= 2.2.1",
+    "pillow >= 10"
+]
+
+[project.entry-points.pytauri]
+ext_mod = "pytauri_moviepy.ext_mod"
+
+[build-system]
+requires = ["setuptools >= 80", "setuptools-scm >= 8"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = { where = ["src-python"] }

@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* 自定义样式 */
+@layer components {
+  .video-preview {
+    @apply w-full h-full object-contain bg-black rounded-lg;
+  }
+  
+  .timeline-track {
+    @apply relative h-12 bg-gray-700 rounded-lg cursor-pointer;
+  }
+  
+  .timeline-selection {
+    @apply absolute h-full bg-blue-500/50 border-2 border-blue-500 rounded;
+  }
+  
+  .timeline-handle {
+    @apply absolute top-0 w-2 h-full bg-blue-500 cursor-ew-resize hover:bg-blue-400;
+  }
+}
