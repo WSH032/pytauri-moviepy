@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { 
   Film, 
   Scissors, 
@@ -41,7 +42,41 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
 
-  // Load video
+  // Shared video loading logic
+  const loadVideo = async (path: string, source: "manual" | "mcp") => {
+    setStatus(source === "mcp" ? `Loading video from MCP: ${path}` : "Loading video...");
+    setVideoPath(path);
+    setPreviewPath("");
+    setPreviewSrc("");
+    
+    try {
+      const info = await api.getVideoInfo({ inputPath: path });
+      
+      setVideoInfo(info);
+      setEndTime(info.duration);
+      setStartTime(0);
+      setCurrentTime(0);
+      setVideoSrc(convertFileSrc(path));
+      
+      const prefix = source === "mcp" ? "Video loaded via MCP" : "Video loaded";
+      setStatus(`${prefix}: ${info.duration.toFixed(2)}s, ${info.size[0]}x${info.size[1]}`);
+    } catch (error) {
+      setStatus(`Error ${source === "mcp" ? "loading video from MCP" : ""}: ${error}`);
+    }
+  };
+
+  // Listen for MCP load video events
+  useEffect(() => {
+    const unlisten = listen<{ path: string }>("mcp-load-video", (event) => {
+      loadVideo(event.payload.path, "mcp");
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
+
+  // Load video manually
   const handleLoadVideo = async () => {
     const selected = await open({
       multiple: false,
@@ -50,29 +85,7 @@ function App() {
     });
 
     if (selected) {
-      setStatus("Loading video...");
-      setVideoPath(selected);
-      setPreviewPath("");
-      setPreviewSrc("");
-      
-      try {
-        const info = await api.getVideoInfo({
-          inputPath: selected
-        });
-        
-        setVideoInfo(info);
-        setEndTime(info.duration);
-        setStartTime(0);
-        setCurrentTime(0);
-        
-        // Convert to asset URL for video player
-        const assetUrl = convertFileSrc(selected);
-        setVideoSrc(assetUrl);
-        
-        setStatus(`Video loaded: ${info.duration.toFixed(2)}s, ${info.size[0]}x${info.size[1]}`);
-      } catch (error) {
-        setStatus(`Error: ${error}`);
-      }
+      await loadVideo(selected, "manual");
     }
   };
 

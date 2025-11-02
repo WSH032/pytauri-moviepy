@@ -1,3 +1,19 @@
+# --- Hack `sys.path` to support using `pywin32` ---
+#
+# `mcp` depends on `pywin32`, and `pywin32` does not work properly in embedded environments, see:
+# - <https://github.com/indygreg/PyOxidizer/issues/442#issuecomment-940829173>
+# - <https://github.com/mhammond/pywin32/blob/572e657c6c24415fc364d9e31bbe78c0dac6eb9c/win32/Lib/pywintypes.py#L8>
+import sys
+
+
+if sys.platform == "win32" and hasattr(sys, "frozen"):
+    import pywin32_system32
+
+    sys.path.append(pywin32_system32.__path__[0])
+
+# --------------------------------------------------
+
+
 from os import getenv
 import atexit
 from pathlib import Path
@@ -11,14 +27,23 @@ from pytauri import (
     Commands,
     builder_factory,
     context_factory,
+    Emitter,
+    AppHandle,
 )
+from mcp.server.fastmcp import FastMCP
 
 from moviepy import VideoClip, VideoFileClip
+
 
 # Enable TypeScript generation in development
 PYTAURI_GEN_TS = getenv("PYTAURI_GEN_TS") != "0"
 
 commands: Commands = Commands(experimental_gen_ts=PYTAURI_GEN_TS)
+
+mcp = FastMCP("pytauri-moviepy")
+
+app_handle: AppHandle
+"""Global singleton AppHandle, which will be initialized later."""
 
 
 # Base model with camelCase conversion
@@ -165,8 +190,59 @@ async def generate_preview(body: PreviewRequest) -> str:
     return str(_preview_temp_path)
 
 
+# Supported video formats
+VIDEO_FORMATS = ["mp4", "avi", "mov", "mkv", "webm"]
+
+
+class VideoPathPayload(BaseModel):
+    path: Path
+
+
+@mcp.tool()
+def load_video_from_path(video_path: str) -> dict:
+    """Load a video file from the specified path into the video editor.
+
+    This tool validates the video file format and sends an event to the frontend
+    to load the video automatically.
+
+    Args:
+        video_path: Absolute path to the video file
+
+    Returns:
+        Dictionary with success status and message
+
+    Raises:
+        ValueError: If the file format is not supported
+    """
+    path = Path(video_path)
+
+    # Check if file exists
+    if not path.exists():
+        raise ValueError(f"File not found: {video_path}")
+
+    # Validate file extension
+    file_extension = path.suffix.lstrip(".").lower()
+    if file_extension not in VIDEO_FORMATS:
+        raise ValueError(
+            f"Unsupported video format: .{file_extension}. "
+            f"Supported formats: {', '.join(VIDEO_FORMATS)}"
+        )
+
+    # Emit event to frontend
+    abs_video_path = path.absolute()
+    Emitter.emit(app_handle, "mcp-load-video", VideoPathPayload(path=abs_video_path))
+
+    return {
+        "success": True,
+        "message": f"Video path sent to editor: {video_path}",
+        "path": str(abs_video_path),
+    }
+
+
 def main() -> int:
     with start_blocking_portal("asyncio") as portal:
+        mcp_task = portal.start_task_soon(mcp.run_streamable_http_async)
+
         if PYTAURI_GEN_TS:
             # Generate TypeScript client to frontend src/bindings directory
             output_dir = Path(__file__).parent.parent.parent.parent / "src" / "bindings"
@@ -184,5 +260,10 @@ def main() -> int:
             context=context_factory(),
             invoke_handler=commands.generate_handler(portal),
         )
+
+        global app_handle
+        app_handle = app.handle()
+
         exit_code = app.run_return()
+        mcp_task.cancel()  # close the MCP server, or it will run forever
         return exit_code
