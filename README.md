@@ -1,7 +1,28 @@
-# Tauri + React + Typescript
+# PyTauri + MoviePy
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+This is a demo to verify whether a [MoviePy]-based video editing [PyTauri] app can be developed using Vibe Coding.
 
-## Recommended IDE Setup
+All code was generated with VSCode Copilot under my review.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+[PyTauri]: https://github.com/pytauri/pytauri
+[MoviePy]: https://github.com/Zulko/moviepy/
+
+## Features
+
+- Integration of PyTauri with MoviePy; the frontend displays video editing effects
+- MCP server for connecting to AI services
+
+## Development
+
+```bash
+# install frontend dependencies
+pnpm install
+
+# install python dependencies
+uv venv --python-preference only-system
+source .venv/bin/activate
+uv sync
+
+# run the app
+pnpm tauri dev
+```
