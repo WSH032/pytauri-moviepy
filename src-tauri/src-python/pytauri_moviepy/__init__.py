@@ -31,6 +31,7 @@ from pytauri import (
     AppHandle,
 )
 from mcp.server.fastmcp import FastMCP
+from anyio import to_thread
 
 from moviepy import VideoClip, VideoFileClip
 
@@ -118,7 +119,11 @@ async def clip_video(body: VideoClipRequest) -> str:
     end_time = body.end_time if body.end_time else video.duration
     clipped: VideoClip = video.subclipped(body.start_time, end_time)
 
-    clipped.write_videofile(body.output_path, codec="libx264", audio_codec="aac")
+    await to_thread.run_sync(
+        lambda: clipped.write_videofile(
+            body.output_path, codec="libx264", audio_codec="aac"
+        )
+    )
 
     clipped.close()
     video.close()
@@ -176,12 +181,14 @@ async def generate_preview(body: PreviewRequest) -> str:
 
         atexit.register(_cleanup_preview_file)
 
-    clipped.write_videofile(
-        str(_preview_temp_path),
-        codec="libx264",
-        audio_codec="aac",
-        preset="ultrafast",
-        bitrate="1000k",
+    await to_thread.run_sync(
+        lambda: clipped.write_videofile(
+            str(_preview_temp_path),
+            codec="libx264",
+            audio_codec="aac",
+            preset="ultrafast",
+            bitrate="1000k",
+        )
     )
 
     clipped.close()
